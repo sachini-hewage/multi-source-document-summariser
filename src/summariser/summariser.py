@@ -9,123 +9,172 @@ from src.summariser.prompt_templates import (
     PARAGRAPH_CLUSTER_TEMPLATE,
 )
 
+
 class Summariser:
     """
-    Summariser class to generate summaries using an Ollama LLM from configuration.
+    Summariser class to generate summaries using an Ollama LLM.
 
-    Supports three summarization methods:
-      1. pairing
-      2. sentence_clustering
-      3. paragraph_clustering
+    Supported methods:
+      1. individual
+      2. pairing
+      3. sentence_clustering
+      4. paragraph_clustering
 
-    Uses pre-defined prompt templates for each method and calls the specified Ollama model.
+    Entity handling is delegated entirely to the prompt templates.
     """
 
     def __init__(self, model="qwen3:8b"):
-        """
-        Initialize Summariser.
-
-        Args:
-            model (str): Ollama model name to use for summarization.
-        """
         self.model = model
 
+    # ------------------------------------------------------------------
+    # Core summarisation entrypoint
+    # ------------------------------------------------------------------
 
-    # Core entrypoint to summarisation
-
-    def summarize(self, data, method):
+    def summarize(self, data, method, entities=None):
         """
-        Generate summary for given data using the selected method.
+        Generate summary using selected method.
 
         Args:
-            data (dict/list): Input data to summarize (e.g., paired paragraphs, clustered sentences, etc.)
-            method (str): Summarization method: "individual", "pairing", "sentence_clustering", or "paragraph_clustering"
+            data: Input data
+            method: summarisation method
+            entities: list of entities (passed to template via payload)
 
         Returns:
-            str: Generated summary from the Ollama model
+            Generated summary
         """
-        # Select template based on method
+
+        # ------------------------
+        # Individual summarisation
+        # ------------------------
+
         if method == "individual":
+
             template = INDIVIDUAL_SUMMARY_TEMPLATE
-            # Handle both string or list input (for batch documents)
+
             if isinstance(data, list):
+
                 summaries = []
+
                 for i, text in enumerate(data):
-                    print(f"[Summariser] Summarizing individual document {i + 1}/{len(data)}")
-                    input_text = f"{template}\n\n{text}\n\nSummary:"
-                    summaries.append(self.call_llm(input_text))
-                return summaries  # list of summaries
+
+                    print(f"[Summariser] Summarizing individual document {i+1}/{len(data)}")
+
+                    payload = {
+                        "entities": entities,
+                        "data": text
+                    } if entities else text
+
+                    prompt = (
+                        template
+                        + "\n\nData:\n"
+                        + json.dumps(payload, indent=2, ensure_ascii=False)
+                        + "\n\nSummary:"
+                    )
+
+                    summaries.append(self.call_llm(prompt))
+
+                return summaries
+
             else:
-                input_text = f"{template}\n\n{data}\n\nSummary:"
-                return self.call_llm(input_text)
-        elif method == "pairing":
+
+                payload = {
+                    "entities": entities,
+                    "data": data
+                } if entities else data
+
+                prompt = (
+                    template
+                    + "\n\nData:\n"
+                    + json.dumps(payload, indent=2, ensure_ascii=False)
+                    + "\n\nSummary:"
+                )
+
+                return self.call_llm(prompt)
+
+        # ------------------------
+        # Select template
+        # ------------------------
+
+        if method == "pairing":
+
             template = PAIRING_TEMPLATE
+
         elif method == "sentence_clustering":
+
             template = SENTENCE_CLUSTER_TEMPLATE
+
         elif method == "paragraph_clustering":
+
             template = PARAGRAPH_CLUSTER_TEMPLATE
+
         else:
+
             raise ValueError(f"Unknown summarization method: {method}")
 
-        # Combine template with JSON-formatted input data
-        input_text = template + "\n\nData:\n" + json.dumps(data, indent=2, ensure_ascii=False)
+        # ------------------------
+        # Prepare payload
+        # ------------------------
 
-        # Call LLM with constructed prompt
-        return self.call_llm(input_text)
+        payload = {
+            "entities": entities,
+            "data": data
+        } if entities else data
 
+        prompt = (
+            template
+            + "\n\nData:\n"
+            + json.dumps(payload, indent=2, ensure_ascii=False)
+        )
 
-    # Generic Ollama call
+        return self.call_llm(prompt)
+
+    # ------------------------------------------------------------------
+    # Ollama call
+    # ------------------------------------------------------------------
 
     def call_llm(self, prompt):
-        """
-        Run Ollama LLM with given prompt.
 
-        Args:
-            prompt (str): Full text prompt to feed into the model
-
-        Returns:
-            str: Model output (summary text)
-        """
         result = subprocess.run(
-            ["ollama", "run", self.model, "--hidethinking"], # In case I use a thinking model
+            ["ollama", "run", self.model, "--hidethinking"],
             input=prompt.encode("utf-8"),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
 
-        # Decode stdout
         output = result.stdout.decode("utf-8").strip()
 
-        # Print errors if LLM call failed
         if result.returncode != 0:
             print("Ollama stderr:", result.stderr.decode("utf-8"))
 
         return output
 
-
+    # ------------------------------------------------------------------
     # Ablation wrapper
-    def run_for_ablation(self, mode, method, input_file, results_dir):
-        """
-        Wrapper to generate and save summaries for ablation experiments.
+    # ------------------------------------------------------------------
 
-        Args:
-            mode (str): Mode of the experiment (e.g., dataset split or ablation type)
-            method (str): Summarization method
-            input_file (str/Path): JSON file containing input data
-            results_dir (str/Path): Directory to save generated summaries
-        """
+    def run_for_ablation(self, mode, method, input_file, results_dir, entities=None):
+
         print(f"[Summariser] Summarizing {method} results for mode={mode}")
 
-        # Load input data from JSON file
         with open(input_file, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Generate summary
-        summary = self.summarize(data, method)
+        summary = self.summarize(
+            data=data,
+            method=method,
+            entities=entities
+        )
 
-        # Save summary to output file
         output_file = Path(results_dir) / f"summary_{method}.txt"
+
         with open(output_file, "w", encoding="utf-8") as f:
-            f.write(summary)
+
+            if isinstance(summary, list):
+
+                f.write("\n\n".join(summary))
+
+            else:
+
+                f.write(summary)
 
         print(f"[Summariser] Saved {method} summary to {output_file}")

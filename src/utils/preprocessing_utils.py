@@ -1,5 +1,6 @@
 from datasets import load_dataset
 import spacy
+from typing import List, Set
 from pathlib import Path
 import json
 import re
@@ -56,6 +57,7 @@ def preprocess_instance_base(
     - Save baseline JSONL
     """
     nlp = spacy.load("en_core_web_sm")
+    print(instance)
     raw_texts = instance["document"].split("|||||")
 
     mode_dir = out_dir / mode
@@ -109,6 +111,37 @@ def preprocess_instance_base(
     return raw_texts, out_file
 
 
+_nlp = spacy.load("en_core_web_sm")
+
+def extract_person_entities(raw_texts: List[str],unique: bool = True) -> List[str]:
+    """
+    Extract PERSON-type named entities from a list of raw texts.
+
+    Args:
+        raw_texts: List of input text strings
+        unique: If True, return unique names only
+
+    Returns:
+        List of PERSON entity strings
+    """
+    persons: Set[str] | List[str]
+
+    persons = set() if unique else []
+
+    for text in raw_texts:
+        if not text:
+            continue
+
+        doc = _nlp(text)
+        for ent in doc.ents:
+            if ent.label_ == "PERSON":
+                name = ent.text.strip()
+                if unique:
+                    persons.add(name)
+                else:
+                    persons.append(name)
+
+    return list(persons)
 
 # ABLATION-SPECIFIC PREPROCESSING (coref/ coref+ner)
 
@@ -194,10 +227,11 @@ def apply_ablation_processing(
 
 
 
-# POSTPROCESSING (ablation-independent)
+
 # POSTPROCESSING (ablation-independent)
 def postprocess_instance_outputs(
     raw_texts,
+    entities,
     results_dir: Path,
     embedder=None,
     dissimilar_thresh: float = 0.3,
@@ -228,7 +262,7 @@ def postprocess_instance_outputs(
     # Convert direct speech to reported  reported speech
     doc_summaries = []
     for doc_text in cleaned_texts:
-        summary = summariser.summarize(doc_text, method="individual")
+        summary = summariser.summarize(doc_text,method="individual",  entities=entities)
         doc_summaries.append(summary)
 
     # Collect sentences and filter by dissimilarity

@@ -1,51 +1,78 @@
-
 # Prompt Templates for LLM Summarisation
 # ========================================
 
 
-
-
-INDIVIDUAL_SUMMARY_TEMPLATE ="""
+INDIVIDUAL_SUMMARY_TEMPLATE = """
 
 Convert all direct quotes in the following text into reported/indirect speech. 
 Do not use quotation marks. Write it as a coherent narrative summary while keeping all key information.
 Keep the sentences short and coherent. 
 
+
+You are given a list of entities.
+
+ENTITY REQUIREMENTS:
+- Every listed entity MUST appear at least once in the final summary.
+- Use each entity exactly as provided.
+- Do NOT omit any entity.
+- Do NOT replace entities with pronouns.
+- Do NOT generalize, merge, shorten, or rename entities.
+
+Entities:
+{entities}
+
 For example:
 
 Direct speech:
-"Well, you see, I was shocked by what he said," she said. "But I don't know why I should be punished for his actions."
+"Well, you see, I was shocked by what he said," Anne said. "But I don't know why I should be punished for his actions."
 
 Reported speech:
-She said she was shocked by what he said and did not understand why she should be punished for his actions.
+Anna said she was shocked by what he said and did not understand why she should be punished for his actions.
 
 Now convert the following text:
 
 Text:
 {document_text}
 
-Return only the converted text.
-
-
+IMPORTANT OUTPUT CONSTRAINT:
+- The output must contain ONLY the converted narrative text.
+- Do NOT mention entities, entity lists, instructions, or formatting labels.
+- Do NOT add explanations, headings, or meta commentary.
+- Do NOT repeat or reference the word "entities" in any form.
 """
 
-PAIRING_TEMPLATE = f""" 
+
+# -------------------------------------------------------------
+
+
+PAIRING_TEMPLATE = """
 
 ### Your Task
 You are given a set of text groupings. 
 Each cluster may include a base sentence, a counterpart sentence, and several auxiliary sentences.
 Some clusters may represent leftover sentences that did not strongly match any base; treat these as a single pseudo-cluster.
 
+You are also given a list of entities.
+
+ENTITY REQUIREMENTS:
+- Every listed entity MUST appear at least once in the final summary.
+- Use each entity exactly as provided.
+- Do NOT omit any entity.
+- Do NOT replace entities with pronouns.
+- Do NOT generalize, merge, shorten, or rename entities.
+
+Entities:
+{entities}
+
 ### Instructions 
 
 1. **Read Carefully:** 
     - First, extract all distinct facts, claims, and key entities from the base, counterpart, and all aux paragraphs.
     - Identify overlaps and merge equivalent information, but do **not** drop unique facts unless they are trivial or completely redundant. 
-    
+
 2. **Pseudo-Clusters Handling:**  
     - If a cluster is marked `"pseudo": True`, treat **each sentence in its aux paragraphs as completely independent information**. 
     - Each sentence in a pseudo cluster should be fully represented in the summary.
-
 
 3. **Generate the Summary:** 
     - Write in **clear, small sentences**, ideally one fact per sentence. 
@@ -53,7 +80,7 @@ Some clusters may represent leftover sentences that did not strongly match any b
     - Then **enrich** it with **complementary or additional facts** from the counterpart and aux paragraphs.
     - Include all details from pseudo cluster. 
     - Include any quotes as-is. 
-    - Retain all named entities.  
+    - Retain all named entities, including all provided entities.
 
 4. **Metadata Annotation:** 
     - After every factual statement, annotate all source paragraph IDs supporting that fact in brackets. 
@@ -71,14 +98,29 @@ The Mars rover successfully collected its first rock samples from the Jezero Cra
 
 --- 
 
-**Key Reminder:** Coverage matters most. include every meaningful, distinct fact from the base, counterpart, and aux paragraphs.Return only the summary as a paragraph with inline ID arrays.
+**Key Reminder:** Coverage matters most. Include every meaningful, distinct fact and ensure every listed entity appears. Return only the summary as a paragraph with inline ID arrays.
 """
+
 
 # -------------------------------------------------------------
 
+
 SENTENCE_CLUSTER_TEMPLATE = """
+
 You are given clusters of semantically similar sentences extracted from multiple documents. 
 
+
+You are also given a list of entities.
+
+ENTITY REQUIREMENTS:
+- Every listed entity MUST appear at least once in the final summary.
+- Use each entity exactly as provided.
+- Do NOT omit any entity.
+- Do NOT replace entities with pronouns.
+- Do NOT generalize, merge, shorten, or rename entities.
+
+Entities:
+{entities}
 
 ### Your Task
 
@@ -89,7 +131,7 @@ Produce a **comprehensive, factual, and concise merged summary** that preserves 
 1. **Fact Extraction Phase:**
     - For each cluster, carefully read all its sentences.
     - Identify *every distinct fact, claim, or detail*, even if expressed slightly differently.
-    - Capture named entities (people, organizations, locations, dates, numbers) exactly as they appear — do **not generalize or omit** them.
+    - Capture named entities exactly as they appear.
 
 2. **Fact Merging Phase:**
     - Merge equivalent statements across sentences but keep **all unique facts**.
@@ -99,7 +141,7 @@ Produce a **comprehensive, factual, and concise merged summary** that preserves 
 3. **Summary Generation Phase:**
     - Write short, precise sentences — ideally one fact per sentence.
     - Include any quotes as-is.
-    - Retain all named entities.
+    - Retain all named entities, including all provided entities.
     - Maintain factual accuracy.
     - Ensure the resulting paragraph **covers all distinct facts** found in the cluster.
 
@@ -119,13 +161,29 @@ Produce a **comprehensive, factual, and concise merged summary** that preserves 
 
 The United Nations approved a new climate accord committing member nations to reduce carbon emissions by 40% by 2035 [doc1_3_0,doc4_2_1]. Several developing countries emphasized the need for financial support to transition to clean energy [doc1_4_0,doc3_1_2]. The agreement builds on the Paris Accords, introducing stricter accountability mechanisms for emissions tracking [doc2_5_0,doc4_2_3].
 
-**Key Reminder:** Coverage is the top priority. Include every distinct, factual, and meaningful point from the cluster. Return only the summary as a paragraph with inline ID arrays. 
+**Key Reminder:** Coverage is the top priority. Ensure every listed entity appears. Return only the summary as a paragraph with inline ID arrays. 
 """
+
 
 # -------------------------------------------------------------
 
+
 PARAGRAPH_CLUSTER_TEMPLATE = """
+
 You are given clusters of semantically similar paragraphs gathered from multiple source documents. 
+
+
+You are also given a list of entities.
+
+ENTITY REQUIREMENTS:
+- Every listed entity MUST appear at least once in the final summary.
+- Use each entity exactly as provided.
+- Do NOT omit any entity.
+- Do NOT replace entities with pronouns.
+- Do NOT generalize, merge, shorten, or rename entities.
+
+Entities:
+{entities}
 
 ### Your Task
 
@@ -136,7 +194,6 @@ Produce a **comprehensive, factual, and concise merged summary** that preserves 
 1. **Fact Extraction Phase:**
     - For each cluster, read all paragraphs within the cluster carefully.
     - Identify **every unique fact, claim, or piece of information**, even if expressed differently across sources.
-    - Preserve **all named entities, numerical data, places, and time references** exactly as stated.  
 
 2. **Fact Merging Phase:**
     - When multiple paragraphs convey the same idea, merge them into a single clear sentence.
@@ -144,9 +201,8 @@ Produce a **comprehensive, factual, and concise merged summary** that preserves 
 3. **Summary Generation Phase:**
     - Write short, clear, factual sentences — ideally one fact per sentence.
     - Include any quotes as-is.
-    - Retain all named entities.
+    - Retain all named entities, including all provided entities.
     - Maintain coherence and readability while prioritizing **coverage** of all unique facts.
-    - Ensure no significant detail from any paragraph is lost.
 
 4. **Metadata Annotation:**
     - After each factual statement, annotate **all metadata IDs** of paragraphs that support that fact.
@@ -163,5 +219,5 @@ Produce a **comprehensive, factual, and concise merged summary** that preserves 
 
 Scientists have discovered a new exoplanet orbiting within the habitable zone of a nearby star located approximately 12 light-years from Earth [doc1_6,doc3_2]. The planet, slightly larger than Earth, could sustain liquid water under suitable atmospheric conditions [doc1_6,doc4_1]. Astronomers plan follow-up observations with the James Webb Space Telescope to study its atmospheric composition [doc2_7,doc3_2,doc4_1].
 
-**Key Reminder:** Coverage is the highest priority. Every distinct, meaningful fact from the cluster must appear in the summary.Return only the summary as a paragraph with inline ID arrays.
+**Key Reminder:** Coverage is the highest priority. Ensure every listed entity appears. Return only the summary as a paragraph with inline ID arrays.
 """

@@ -33,7 +33,7 @@ if __name__ == "__main__":
     pipeline = Pipeline(config)
 
     # Run for first 10 instances
-    for instance_id in range(27, 28):
+    for instance_id in range(1,2):
         print(f"\n=== Running pipeline for instance {instance_id} ===")
 
         # Run pipeline for current instance

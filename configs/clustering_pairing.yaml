@@ -1,7 +1,7 @@
 ablation_modes:
-#  - baseline
+ - baseline
  - coref
-#  - coref+ner
+ - coref+ner
 
 # ==========================
 # Paths

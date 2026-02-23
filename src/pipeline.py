@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 from src.utils.preprocessing_utils import (
     preprocess_instance_base,
     apply_ablation_processing,
-    postprocess_instance_outputs,
+    postprocess_instance_outputs, extract_person_entities,
 )
 from src.utils.embedding_utils import Embedder
 from src.clusterer.pairing_clusterer import PairingClusterer
@@ -85,6 +85,7 @@ class Pipeline:
 
         instance = all_instances[instance_id]
 
+
         # Step 0: Base preprocessing (common for all)
         print("\n[Step 0] Base preprocessing (ablation-independent)")
         raw_texts, base_out_file = preprocess_instance_base(
@@ -96,8 +97,11 @@ class Pipeline:
         # Step 1: Postprocessing for similarity filtering & golden summary
         print("\n[Step 1] Generating golden summary and performing similarity filtering")
         print(raw_texts)
+        entities = extract_person_entities(raw_texts)
+        print(entities)
         postprocess_instance_outputs(
             raw_texts,
+            entities,
             results_dir=Path("data/results"),
             embedder=embedder
         )
@@ -176,10 +180,10 @@ class Pipeline:
             except Exception as e:
                 print(f" Paragraph clustering failed for mode={mode}: {e}. Skipping this step.")
 
-            Step 8: Summarisation
+            # Step 8: Summarisation
             print(f"\n[Step 8] Generating summaries for mode={mode}")
             self._generate_summaries(
-                mode, summaries_dir, pairing_file, sentence_clusters_file, paragraph_clusters_file
+                mode, summaries_dir, pairing_file, sentence_clusters_file, paragraph_clusters_file, entities
             )
 
         # # Step 9: Apply MMR redundancy reduction to summaries for each mode
@@ -282,7 +286,7 @@ class Pipeline:
         return lookup
 
     def _generate_summaries(
-        self, mode, summaries_dir, pairing_file, sentence_clusters_file, paragraph_clusters_file
+        self, mode, summaries_dir, pairing_file, sentence_clusters_file, paragraph_clusters_file,entities
     ):
         summary_tasks = [
             ("pairing", pairing_file, summaries_dir / "summary_pairing.txt"),
@@ -298,7 +302,7 @@ class Pipeline:
                     continue
                 with open(input_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                summary = self.summarizer.summarize(data, method)
+                summary = self.summarizer.summarize(data, method, entities=entities)
                 with open(output_file, "w", encoding="utf-8") as f:
                     f.write(summary)
                 print(f"Saved {method} summary to {output_file}")
